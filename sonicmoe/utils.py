@@ -6,7 +6,8 @@ from typing import Any, Callable
 
 import torch
 from cutlass.cute.runtime import from_dlpack
-from torch.utils._pytree import tree_map
+# from torch.utils._pytree import 
+from paddle.utils import map_structure
 
 
 def make_contiguous(x: Any) -> Any:
@@ -15,8 +16,8 @@ def make_contiguous(x: Any) -> Any:
 
 def ensure_contiguous(func: Callable) -> Callable:
     def inner(*args, **kwargs):
-        args = tree_map(make_contiguous, args)
-        kwargs = tree_map(make_contiguous, kwargs)
+        args = map_structure(make_contiguous, args)
+        kwargs = map_structure(make_contiguous, kwargs)
         return func(*args, **kwargs)
 
     return inner

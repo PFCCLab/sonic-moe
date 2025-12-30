@@ -19,7 +19,7 @@ _WORLD_SIZE = int(os.getenv("WORLD_SIZE", 1))
 _ALL_COMPILED_MODULES = {}
 
 
-@torch.compiler.disable
+# @torch.compiler.disable
 def _get_cpp_function(function_name: str, module_name: str, source_files: list[str], build_directory: str) -> Callable:
     module_name = f"{_CPP_MODULE_PREFIX}_{module_name}"
 
@@ -41,8 +41,8 @@ def _get_cpp_function(function_name: str, module_name: str, source_files: list[s
                 module = load_cpp_extension(
                     module_name,
                     sources=source_files,
-                    with_cuda=True,
-                    extra_cflags=extra_cflags,
+                    # with_cuda=True,
+                    extra_cxx_cflags=extra_cflags,
                     extra_cuda_cflags=extra_cuda_cflags,
                     extra_include_paths=extra_include_paths,
                     build_directory=build_directory,
@@ -55,8 +55,8 @@ def _get_cpp_function(function_name: str, module_name: str, source_files: list[s
                 module = load_cpp_extension(
                     module_name,
                     sources=source_files,
-                    with_cuda=True,
-                    extra_cflags=extra_cflags,
+                    # with_cuda=True,
+                    extra_cxx_cflags=extra_cflags,
                     extra_cuda_cflags=extra_cuda_cflags,
                     extra_include_paths=extra_include_paths,
                     build_directory=build_directory,
@@ -71,8 +71,8 @@ def _get_cpp_function(function_name: str, module_name: str, source_files: list[s
             module = load_cpp_extension(
                 module_name,
                 sources=source_files,
-                with_cuda=True,
-                extra_cflags=extra_cflags,
+                # with_cuda=True,
+                extra_cxx_cflags=extra_cflags,
                 extra_cuda_cflags=extra_cuda_cflags,
                 extra_include_paths=extra_include_paths,
                 build_directory=build_directory,

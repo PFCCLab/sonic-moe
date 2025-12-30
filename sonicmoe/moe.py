@@ -4,6 +4,8 @@
 
 from typing import Callable
 
+import paddle
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -138,7 +140,7 @@ class Experts(nn.Module):
         self, input: torch.Tensor, expert_frequency: torch.Tensor | None, return_list: bool = False
     ) -> list[torch.Tensor] | torch.Tensor:
         if isinstance(input, torch.Tensor):
-            input = input.split(expert_frequency.tolist(), dim=0)
+            input = paddle.compat.split(input, expert_frequency.tolist(), dim=0)
         else:
             assert expert_frequency is None
 
@@ -203,7 +205,7 @@ class MoE(nn.Module):
             std=std,
         )
 
-        self.stream_id = torch.cuda.current_stream().cuda_stream
+        self.stream_id = torch.cuda.current_stream().stream_base.raw_stream
 
     def forward(
         self,
@@ -298,7 +300,7 @@ class MoE(nn.Module):
         selected_experts = selected_experts.flatten()
 
         with torch.no_grad():
-            sorted_expert_idxs, sorted_scattered_idxs = selected_experts.sort()
+            sorted_expert_idxs, sorted_scattered_idxs = paddle.compat.sort(selected_experts)
 
         is_num_experts_multiple_of_4 = self.num_experts % 4 == 0
 
@@ -356,7 +358,7 @@ class MoE(nn.Module):
 
             hidden_states = hidden_states * batch_gates.unsqueeze(-1)
             zeros = torch.zeros((T, self.hidden_size), dtype=torch.float32, device=hidden_states.device)
-            hidden_states = zeros.index_add(0, fan_in_index, hidden_states)
+            hidden_states = zeros.index_add(0, fan_in_index, hidden_states.float())
         else:
             raise ValueError(f"unexpected kernel_backend_moe ({kernel_backend_moe})")
 

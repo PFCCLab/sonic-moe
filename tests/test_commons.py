@@ -2,6 +2,7 @@
 # Copyright (c) 2025, Wentao Guo, Mayank Mishra, Xinle Cheng, Ion Stoica, Tri Dao
 # ********************************************************************************
 
+import paddle
 import random
 from itertools import product
 from typing import Any
@@ -42,7 +43,11 @@ class TestCommons(TestCase):
         dtype: torch.dtype = torch.float32,
     ) -> None:
         if exact_match:
-            assert x.equal(y)
+            if x.dtype == paddle.int32 and y.dtype == paddle.int64:
+                x = x.to(paddle.int64)
+            if x.dtype == paddle.int64 and y.dtype == paddle.int32:
+                y = y.to(paddle.int64)
+            assert x.equal(y).all()
         else:
             assert x.dtype == y.dtype
 
@@ -58,7 +63,9 @@ class TestCommons(TestCase):
     def get_activation_function(self, is_glu: bool) -> nn.Module:
         return nn.GLU() if is_glu else nn.GELU(approximate="tanh")
 
-    def collect_gradients_from_module_and_zero_grads(self, model: nn.Module) -> dict[str, torch.Tensor]:
+    def collect_gradients_from_module_and_zero_grads(
+        self, model: nn.Module
+    ) -> dict[str, torch.Tensor]:
         grads = {}
         for weight_name, weight in model.named_parameters():
             grads[weight_name] = weight.grad
