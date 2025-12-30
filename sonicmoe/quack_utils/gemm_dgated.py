@@ -33,6 +33,7 @@ from quack.gemm_wrapper_utils import GemmWrapperBase
 from quack.sm90_utils import partition_for_epilogue
 from quack.varlen_utils import VarlenManager
 from torch import Tensor
+import cuda.bindings.driver as cuda
 
 
 class GemmDGatedMixin(GemmActMixin):
@@ -447,7 +448,8 @@ def gemm_dgated(
         pingpong,
     )
 
-    current_stream = cutlass_torch.current_stream()
+    # current_stream = cutlass_torch.current_stream()
+    current_stream = cuda.CUstream(torch.cuda.current_stream().stream_base.raw_stream)
     compile_key = GemmWrapperBase.get_compile_key(
         tensor_infos,
         activation,

@@ -21,6 +21,8 @@ from quack.gemm_sm100 import GemmSm100
 from quack.gemm_wrapper_utils import GemmTensorInfo, GemmWrapperBase
 from quack.layout_utils import permute_gated_Cregs_b16
 from torch import Tensor
+import cuda.bindings.driver as cuda
+import torch
 
 
 class GemmGatedMixin(GemmActMixin):
@@ -250,7 +252,8 @@ def gemm_gated(
         pingpong,
     )
 
-    current_stream = cutlass_torch.current_stream()
+    # current_stream = cutlass_torch.current_stream()
+    current_stream = cuda.CUstream(torch.cuda.current_stream().stream_base.raw_stream)
     compile_key = GemmWrapperBase.get_compile_key(
         tensor_infos,
         activation,

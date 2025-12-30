@@ -16,7 +16,8 @@ from .gemm_dgated import gemm_dgated as gemm_dgated_sm90_sm100
 from .gemm_gated import gemm_gated as gemm_gated_sm90_sm100
 
 
-default_device_capacity = get_device_capacity(torch.device("cuda"))
+import paddle
+default_device_capacity = get_device_capacity(paddle.device("cuda"))
 
 
 @autotune(

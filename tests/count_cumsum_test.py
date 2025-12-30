@@ -2,6 +2,10 @@
 # Copyright (c) 2025, Wentao Guo, Mayank Mishra, Xinle Cheng, Ion Stoica, Tri Dao
 # ********************************************************************************
 
+import paddle
+
+paddle.enable_compat()
+
 import random
 from typing import Callable
 
@@ -32,9 +36,9 @@ class CountCumsumTest(TestCommons):
             list(get_1d_tensor_sizes()) + [2097152],  # size
             [4, 8, 72, 256, 1920, 2048, 16384, 50000],  # num_experts
             [False, True],  # do_cumsum
-            [torch.device("cuda")],  # device
-            [torch.long, torch.int],  # dtype
-            [count_cumsum, torch.compile(count_cumsum, fullgraph=True)],  # function
+            [paddle.CUDAPlace(0)],  # device
+            [paddle.long, paddle.int],  # dtype
+            [count_cumsum],  # , torch.compile(count_cumsum, fullgraph=True)],  # function
         )
     )
     def test_count_cumsum(
@@ -42,14 +46,14 @@ class CountCumsumTest(TestCommons):
         size: int,
         num_experts: int,
         do_cumsum: bool,
-        device: torch.device,
-        dtype: torch.dtype,
+        device: paddle.device,
+        dtype: paddle.dtype,
         function: Callable,
     ) -> None:
-        torch._dynamo.config.cache_size_limit = 1024
-        torch._dynamo.config.accumulated_cache_size_limit = 1024
+        # torch._dynamo.config.cache_size_limit = 1024
+        # torch._dynamo.config.accumulated_cache_size_limit = 1024
 
-        x = torch.randint(0, num_experts, (size,), device=device, dtype=dtype)
+        x = torch.randint(0, num_experts, (size,), dtype=dtype).to(device)
 
         z_kernel_cumsum = None
         z_kernel_indices = None

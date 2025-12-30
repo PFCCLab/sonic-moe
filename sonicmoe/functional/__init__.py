@@ -68,6 +68,7 @@ class TC_Softmax_Topk_Router_Function(torch.autograd.Function):
         # change this to router_logits.dtype (bfloat16) increase another 5 tflops at fwd at the cost of numerical accuracy
         topk_router_score = torch.empty(T, K, dtype=torch.float32, device=router_logits.device)
         topk_router_indices = torch.empty(T, K, dtype=torch.int32, device=router_logits.device)
+        ctx.mark_non_differentiable(topk_router_indices)
 
         _softmax_topk_fwd(router_logits, topk_router_score, topk_router_indices, E, K)
 
@@ -75,18 +76,19 @@ class TC_Softmax_Topk_Router_Function(torch.autograd.Function):
         ctx.E = E
         ctx.dtype = router_logits.dtype
 
-        return topk_router_score, topk_router_indices
+        outs = topk_router_score, topk_router_indices
+        return outs
 
     @staticmethod
     def backward(ctx, dtopk_score: torch.Tensor, _: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         T, K = dtopk_score.size()
 
-        topk_router_score, topk_router_indices = ctx.saved_tensors
+        topk_router_score, topk_router_indices = ctx.saved_tensor()
         dlogits = torch.zeros(T, ctx.E, dtype=ctx.dtype, device=topk_router_score.device)
 
         _softmax_topk_bwd(dlogits, None, dtopk_score, topk_router_score, topk_router_indices, K)
 
-        return dlogits, None, None
+        return dlogits
 
 
 class _UpProjection(torch.autograd.Function):
@@ -116,7 +118,7 @@ class _UpProjection(torch.autograd.Function):
         TK = total_expert_freq
 
         if is_using_quack_gemm():
-            assert not torch.compiler.is_compiling()
+            # assert not torch.compiler.is_compiling()
             assert is_glu_activation, "QuACK GEMM does not support non GLU activation yet"
             z, y1 = gemm_gated(
                 x,
@@ -172,7 +174,8 @@ class _UpProjection(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, _: None, dz: torch.Tensor):
-        is_compiling = torch.compiler.is_compiling()
+        # is_compiling = torch.compiler.is_compiling()
+        is_compiling = False
 
         if not is_compiling:
             assert _ is None
@@ -195,10 +198,10 @@ class _UpProjection(torch.autograd.Function):
             s_scatter_idx,
             s_reverse_scatter_idx,
             num_activated_expert_per_token_offset,
-        ) = ctx.saved_tensors
+        ) = ctx.saved_tensor()
 
-        dw1 = torch.empty_like(w1)
-        db1 = None if b1 is None else torch.empty_like(b1)
+        dw1 = torch.empty_like(w1).as_strided(w1.shape, w1.stride())
+        db1 = None if b1 is None else torch.empty_like(b1).as_strided(b1.shape, b1.stride())
 
         if is_using_quack_gemm():
             assert not is_compiling
@@ -252,7 +255,13 @@ class _UpProjection(torch.autograd.Function):
             is_varlen_K=is_varlen_K,
         )
 
-        return dx_reduced, dw1, db1, *[None] * 12
+        # return dx_reduced, dw1, db1, *[None] * 12
+        grads = []
+        grads.extend([dx_reduced, dw1])
+        if db1 is not None:
+            grads.append(db1)
+        grads.extend([None] * 5)
+        return tuple(grads)
 
 
 class _DownProjection(torch.autograd.Function):
@@ -279,7 +288,7 @@ class _DownProjection(torch.autograd.Function):
         H, I, E = w2.shape
 
         if is_using_quack_gemm():
-            assert not torch.compiler.is_compiling()
+            # assert not torch.compiler.is_compiling()
 
             assert b2 is None
             y2 = gemm(y1, w2.permute(2, 1, 0), cu_seqlens_m=expert_frequency_offset)
@@ -346,14 +355,14 @@ class _DownProjection(torch.autograd.Function):
             x_gather_idx,
             s_scatter_idx,
             s_reverse_scatter_idx,
-        ) = ctx.saved_tensors
+        ) = ctx.saved_tensor()
 
-        dw2 = torch.empty_like(w2)
-        db2 = None if b2 is None else torch.empty_like(b2)
-        dz = torch.empty_like(z)
+        dw2 = torch.empty_like(w2).as_strided(w2.shape, w2.stride())
+        db2 = None if b2 is None else torch.empty_like(b2).as_strided(b2.shape, b2.stride())
+        dz = torch.empty_like(z).as_strided(z.shape, z.stride())
 
         if is_using_quack_gemm():
-            assert not torch.compiler.is_compiling()
+            # assert not torch.compiler.is_compiling()
             assert is_glu(activation_type), "QuACK GEMM does not support non GLU activation yet"
 
             s = topk_scores[s_scatter_idx]
@@ -381,7 +390,7 @@ class _DownProjection(torch.autograd.Function):
 
             ds = ds[s_reverse_scatter_idx]
         else:
-            ds = torch.empty_like(topk_scores)
+            ds = torch.empty_like(topk_scores).as_strided(topk_scores.shape, topk_scores.stride())
 
             I = w2.size(1)
             TK = x_gather_idx.size(0)
@@ -422,7 +431,13 @@ class _DownProjection(torch.autograd.Function):
         if not is_varlen_K:
             ds = ds.view(T, K)
 
-        return None, dz, dw2, db2, ds, *[None] * 10
+        # return None, dz, dw2, db2, ds, *[None] * 10
+        grads = []
+        grads.extend([None, dz, dw2])
+        if db2 is not None:
+            grads.append(db2)
+        grads.extend([ds, *[None] * 5])
+        return tuple(grads)
 
 
 def moe_TC_softmax_topk_layer(
