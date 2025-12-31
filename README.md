@@ -19,6 +19,7 @@ Copyright (c) 2025, Wentao Guo, Mayank Mishra, Xinle Cheng, Ion Stoica, Tri Dao
 > ```bash
 > git clone https://github.com/PFCCLab/sonic-moe.git
 > cd sonic-moe
+> pip install -r requirements.txt
 > pip install .
 > ```
 >
