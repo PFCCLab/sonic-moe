@@ -18,26 +18,35 @@ _SEED = 42
 # torch._dynamo.config.accumulated_cache_size_limit = 1024
 # torch._functorch.config.donated_buffer = False
 
+import os
+
+RUN_IN_PADDLE_CI = os.getenv("RUN_IN_PADDLE_CI", None) is not None
+
+problem_shapes = [
+    (8192, 768, 256, 128, 8),
+    (8192, 768, 512, 64, 4),
+    (8192, 768, 1024, 32, 2),
+    (8192, 1536, 256, 128, 8),
+    (8192, 1536, 512, 64, 4),
+    (8192, 1536, 1024, 32, 2),
+    (8192, 4096, 256, 256, 16),
+    (8192, 4096, 512, 128, 8),
+    (8192, 4096, 1024, 64, 4),
+    (8192, 4096, 512, 256, 16),
+    (8192, 4096, 1024, 128, 8),
+    (8192, 4096, 2048, 64, 4),
+]
+
+if RUN_IN_PADDLE_CI:
+    problem_shapes = problem_shapes[:1]
+
 
 class MoETest(TestCommons):
     @parameterized.expand(
         TestCommons.make_args_matrix(
             [paddle.device("cuda")],
             [torch.bfloat16],
-            [
-                (8192, 768, 256, 128, 8),
-                (8192, 768, 512, 64, 4),
-                (8192, 768, 1024, 32, 2),
-                (8192, 1536, 256, 128, 8),
-                (8192, 1536, 512, 64, 4),
-                (8192, 1536, 1024, 32, 2),
-                (8192, 4096, 256, 256, 16),
-                (8192, 4096, 512, 128, 8),
-                (8192, 4096, 1024, 64, 4),
-                (8192, 4096, 512, 256, 16),
-                (8192, 4096, 1024, 128, 8),
-                (8192, 4096, 2048, 64, 4),
-            ],
+            problem_shapes,
             [KernelBackendMoE.sonicmoe],  # kernel_backend_moe
             [False],  # is_compiling
             [False, True],  # add_bias
