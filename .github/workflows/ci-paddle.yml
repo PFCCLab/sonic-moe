@@ -30,7 +30,7 @@ jobs:
           WITH_GPU: "ON"
           CUDA_ARCH_NAME: Hopper
           WITH_AVX: "ON"
-          PY_VERSION: "3.10"
+          PY_VERSION: "3.12"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPU_DEVICES: 3
           no_proxy: "bcebos.com,apiin.im.baidu.com,gitee.com,aliyun.com,.baidu.com,.tuna.tsinghua.edu.cn"
@@ -79,7 +79,7 @@ jobs:
           source $HOME/.local/bin/env
 
           # Create and activate virtual environment
-          uv venv .venv --seed
+          uv venv .venv --seed -p 3.12
           source .venv/bin/activate
 
           # Install paddle
