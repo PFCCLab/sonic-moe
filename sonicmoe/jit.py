@@ -11,16 +11,23 @@ from uuid import uuid4
 import torch
 from torch.utils.cpp_extension import load as load_cpp_extension
 
+from filelock import FileLock
+
 
 _CPP_MODULE_PREFIX = "sonicmoe"
-_GLOBAL_RANK = int(os.getenv("RANK", 0))
-_WORLD_SIZE = int(os.getenv("WORLD_SIZE", 1))
+# _GLOBAL_RANK = int(os.getenv("RANK", 0))
+# _WORLD_SIZE = int(os.getenv("WORLD_SIZE", 1))
 
 _ALL_COMPILED_MODULES = {}
 
 
 # @torch.compiler.disable
 def _get_cpp_function(function_name: str, module_name: str, source_files: list[str], build_directory: str) -> Callable:
+    if torch.distributed.is_initialized():
+        _GLOBAL_RANK = torch.distributed.get_rank()
+        _WORLD_SIZE = torch.distributed.get_world_size()
+    else:
+        _WORLD_SIZE = 1
     module_name = f"{_CPP_MODULE_PREFIX}_{module_name}"
 
     extra_cflags = ["-O3", "-Wall", "-shared", "-fPIC", "-fdiagnostics-color"]
@@ -37,7 +44,10 @@ def _get_cpp_function(function_name: str, module_name: str, source_files: list[s
         if torch.distributed.is_initialized():
             os.makedirs(build_directory, exist_ok=True)
 
-            if _GLOBAL_RANK == 0:
+            # NOTE(SigureMo): Use filelock to ensure this line execute once
+            # The original method may caused hanging in PP
+            lock_path = os.path.join(build_directory, f"{module_name}.lock")
+            with FileLock(lock_path, timeout=300):
                 module = load_cpp_extension(
                     module_name,
                     sources=source_files,
@@ -47,20 +57,6 @@ def _get_cpp_function(function_name: str, module_name: str, source_files: list[s
                     extra_include_paths=extra_include_paths,
                     build_directory=build_directory,
                     verbose=True,
-                )
-
-            torch.distributed.barrier()
-
-            if _GLOBAL_RANK != 0:
-                module = load_cpp_extension(
-                    module_name,
-                    sources=source_files,
-                    # with_cuda=True,
-                    extra_cxx_cflags=extra_cflags,
-                    extra_cuda_cflags=extra_cuda_cflags,
-                    extra_include_paths=extra_include_paths,
-                    build_directory=build_directory,
-                    verbose=False,
                 )
         else:
             if _WORLD_SIZE > 1:

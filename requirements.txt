@@ -10,3 +10,4 @@ pytest
 parameterized
 ninja
 rich
+filelock  # For JIT compile
