@@ -12,6 +12,17 @@ if not (hasattr(paddle.library.CustomOpDef, "__call__") and inspect.isfunction(p
     paddle.library.CustomOpDef.__call__ = __call__
 
 __version__ = "0.1.1"
+def torch_compat_empty(*args, **kwargs):
+    if "device" in  kwargs and kwargs["device"] == "cuda":
+        del kwargs["device"]
+    return paddle.empty(*args, **kwargs)
+
+paddle.compat.proxy._extend_torch_proxy_overrides(
+    {
+        "torch.empty": paddle.compat.proxy.RawOverriddenAttribute(torch_compat_empty),
+    }
+)
+
 from .count_cumsum import count_cumsum
 from .enums import KernelBackendMoE
 from .functional import enable_quack_gemm, moe_general_routing_inputs, moe_TC_softmax_topk_layer
