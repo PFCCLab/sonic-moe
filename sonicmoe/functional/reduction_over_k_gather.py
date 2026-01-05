@@ -48,7 +48,7 @@ def _prune_triton_autotune_config(configs, nargs, **kw):
         return pruned_configs
 
 
-@paddle.use_compat_guard(enable=True, scope={"triton"})
+@paddle.use_compat_guard(enable=True, scope={"triton"}, silent=True)
 @triton.autotune(
     configs=_get_triton_autotune_configs(),
     key=["H", "MAX_K", "w_is_None", "is_varlen_K"],

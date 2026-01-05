@@ -204,7 +204,7 @@ def _router_forward(
     )
 
 
-@paddle.use_compat_guard(enable=True, scope={"triton"})
+@paddle.use_compat_guard(enable=True, scope={"triton"}, silent=True)
 @triton.jit
 def _softmax_fwd_small_kernel(
     logits_ptr, stride_lm: tl.constexpr, stride_ln: tl.constexpr, K: tl.constexpr, BLOCK_K: tl.constexpr
