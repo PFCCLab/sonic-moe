@@ -21,6 +21,8 @@ from quack.tile_scheduler import RasterOrderOption, TileSchedulerArguments
 from ..utils import get_next_power_of_2, get_powers_of_2
 from .tile_scheduler import SonicMoETileScheduler
 
+import paddle
+
 
 def last_even(a: int):
     return a if a % 2 == 0 else a - 1
@@ -438,6 +440,7 @@ def _prune_triton_autotune_config(configs, nargs, **kw):
         return pruned_configs
 
 
+@paddle.use_compat_guard(enable=True, scope={"triton"})
 @triton.autotune(
     configs=_get_triton_autotune_configs(),
     key=["H", "MAX_K", "w_is_None", "is_varlen_K"],
