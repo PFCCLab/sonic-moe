@@ -10,6 +10,8 @@ import triton.language as tl
 
 from ..utils import get_powers_of_2
 
+import paddle
+
 
 ### This triton impl is equivalent as the cute-dsl impl shown above,
 # and also achieves similar memory bandwidth on H100 for large K and H.
@@ -46,6 +48,7 @@ def _prune_triton_autotune_config(configs, nargs, **kw):
         return pruned_configs
 
 
+@paddle.use_compat_guard(enable=True, scope={"triton"})
 @triton.autotune(
     configs=_get_triton_autotune_configs(),
     key=["H", "MAX_K", "w_is_None", "is_varlen_K"],
