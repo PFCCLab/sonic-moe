@@ -16,7 +16,7 @@ from .moe_config import HopperWgmma_MoE_Down_proj_Fwd, HopperWgmma_MoE_Up_proj_F
 from .reduction_over_k_gather import token_gather_and_sum_varlen_K_triton
 from .topk_softmax import TopK_Softmax
 
-import paddle
+from ..triton_utils import wrap_triton_kernel
 
 
 @torch.library.custom_op(f"{LIBRARY_NAME}::_topk_fwd", mutates_args={"values", "indices"})
@@ -204,7 +204,7 @@ def _router_forward(
     )
 
 
-@paddle.use_compat_guard(enable=True, scope={"triton"}, silent=True)
+@wrap_triton_kernel
 @triton.jit
 def _softmax_fwd_small_kernel(
     logits_ptr, stride_lm: tl.constexpr, stride_ln: tl.constexpr, K: tl.constexpr, BLOCK_K: tl.constexpr

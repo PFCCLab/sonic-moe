@@ -20,7 +20,7 @@ from .moe_config import (
 )
 from .reduction_over_k_gather import token_gather_and_sum_varlen_K_triton
 
-import paddle
+from ..triton_utils import wrap_triton_kernel
 
 def _get_autotune_configs_for_db2_and_ds() -> list[triton.Config]:
     configs = []
@@ -29,7 +29,7 @@ def _get_autotune_configs_for_db2_and_ds() -> list[triton.Config]:
     return configs
 
 
-@paddle.use_compat_guard(enable=True, scope={"triton"}, silent=True)
+@wrap_triton_kernel
 @triton.autotune(
     configs=_get_autotune_configs_for_db2_and_ds(),
     key=["H", "E"],
@@ -126,7 +126,7 @@ def _prune_triton_autotune_config(configs, nargs, **kw):
     return pruned_configs
 
 
-@paddle.use_compat_guard(enable=True, scope={"triton"}, silent=True)
+@wrap_triton_kernel
 @triton.autotune(
     configs=_get_autotune_configs_for_db1(),
     key=["I", "E"],
@@ -171,7 +171,7 @@ def db1_kernel(
         tl.store(db1_ptr + Eidx * I + i_offsets, db1_acc, mask=i_mask)
 
 
-@paddle.use_compat_guard(enable=True, scope={"triton"}, silent=True)
+@wrap_triton_kernel
 @triton.jit
 def _colsum_smallN_kernel(
     y_ptr,  # *mut  T, shape [M]
@@ -488,7 +488,7 @@ def _token_broadcast_backward(
     )
 
 
-@paddle.use_compat_guard(enable=True, scope={"triton"}, silent=True)
+@wrap_triton_kernel
 @triton.jit
 def _softmax_bwd_scatter_small_kernel(
     dlogits_ptr,
@@ -561,7 +561,7 @@ def _softmax_topk_bwd(
     )
 
 
-@paddle.use_compat_guard(enable=True, scope={"triton"}, silent=True)
+@wrap_triton_kernel
 @triton.jit
 def _topk_bwd_scatter_small_kernel(
     dlogits_full_ptr,
