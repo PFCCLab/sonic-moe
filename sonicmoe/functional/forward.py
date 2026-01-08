@@ -10,16 +10,21 @@ import triton.language as tl
 from cutlass.cute.runtime import from_dlpack
 from quack.cute_dsl_utils import torch2cute_dtype_map
 
-from ..enums import LIBRARY_NAME, TENSORMAP, ActivationType
+from ..enums import LIBRARY_NAME, TENSORMAP, ActivationType, ScoringFuncType
 from ..utils import convert_torch_tensor_to_cute_tensor
 from .moe_config import HopperWgmma_MoE_Down_proj_Fwd, HopperWgmma_MoE_Up_proj_Fwd
 from .reduction_over_k_gather import token_gather_and_sum_varlen_K_triton
-from .topk_softmax import TopK_Softmax
+from .topk_softmax import Sigmoid_TopK, Softmax_TopK, TopK_Softmax
 
 
 @torch.library.custom_op(f"{LIBRARY_NAME}::_topk_fwd", mutates_args={"values", "indices"})
 def _topk_fwd(
-    x: torch.Tensor, k: int, values: torch.Tensor, indices: torch.Tensor, require_softmax_fusion: bool = True
+    x: torch.Tensor,
+    k: int,
+    values: torch.Tensor,
+    indices: torch.Tensor,
+    require_softmax_fusion: bool = True,
+    scoring_func: ScoringFuncType = ScoringFuncType.SOFTMAX,
 ) -> None:
     """Top-k forward pass.
     Args:
@@ -38,13 +43,25 @@ def _topk_fwd(
 
     x_tensor, values_tensor, indices_tensor = [convert_from_dlpack(tensor) for tensor in (x, values, indices)]
     current_stream = cuda.CUstream(torch.cuda.current_stream().stream_base.raw_stream)
-    compile_key = (input_dtype, output_dtype, N, k, require_softmax_fusion)
-    if compile_key not in _topk_fwd.compile_cache:
-        topk_op = TopK_Softmax(input_dtype, output_dtype, N, k, require_softmax_fusion)
-        _topk_fwd.compile_cache[compile_key] = cute.compile(
-            topk_op, x_tensor, values_tensor, indices_tensor, current_stream
-        )
-    _topk_fwd.compile_cache[compile_key](x_tensor, values_tensor, indices_tensor, current_stream)
+
+    if scoring_func == ScoringFuncType.SOFTMAX:
+        compile_key = (input_dtype, output_dtype, N, k, require_softmax_fusion, scoring_func)
+        if compile_key not in _topk_fwd.compile_cache:
+            topk_op = Softmax_TopK(input_dtype, output_dtype, N, k, require_softmax_fusion, scoring_func)
+            _topk_fwd.compile_cache[compile_key] = cute.compile(
+                topk_op, x_tensor, values_tensor, indices_tensor, current_stream
+            )
+        _topk_fwd.compile_cache[compile_key](x_tensor, values_tensor, indices_tensor, current_stream)
+    elif scoring_func == ScoringFuncType.SIGMOID:
+        compile_key = (input_dtype, output_dtype, N, k, require_softmax_fusion, scoring_func)
+        if compile_key not in _topk_fwd.compile_cache:
+            topk_op = Sigmoid_TopK(input_dtype, output_dtype, N, k, require_softmax_fusion, scoring_func)
+            _topk_fwd.compile_cache[compile_key] = cute.compile(
+                topk_op, x_tensor, values_tensor, indices_tensor, current_stream
+            )
+        _topk_fwd.compile_cache[compile_key](x_tensor, values_tensor, indices_tensor, current_stream)
+
+    # TODO: support TopK_Softmax and TopK_Sigmoid
 
 
 _topk_fwd.compile_cache = {}
@@ -225,12 +242,24 @@ def _softmax_fwd_small_kernel(
     f"{LIBRARY_NAME}::_softmax_topk_fwd", mutates_args={"topk_router_score", "topk_router_indices"}
 )
 def _softmax_topk_fwd(
-    router_logits: torch.Tensor, topk_router_score: torch.Tensor, topk_router_indices: torch.Tensor, E: int, K: int
+    router_logits: torch.Tensor,
+    topk_router_score: torch.Tensor,
+    topk_router_indices: torch.Tensor,
+    E: int,
+    K: int,
+    scoring_func: ScoringFuncType,
 ) -> None:
     # T = router_logits.shape[0]
     if E <= 4096 and K <= 16 and E % 8 == 0:
         # fast topk-softmax fusion that covers most common MoE configs
-        _topk_fwd(router_logits, K, topk_router_score, topk_router_indices, require_softmax_fusion=True)
+        _topk_fwd(
+            router_logits,
+            K,
+            topk_router_score,
+            topk_router_indices,
+            require_softmax_fusion=True,
+            scoring_func=scoring_func,
+        )
     else:
         topk_results = router_logits.topk(K, dim=-1)
         topk_router_score.copy_(topk_results.values.softmax(dim=-1, dtype=torch.float32).to(topk_router_score.dtype))

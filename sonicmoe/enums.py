@@ -26,5 +26,10 @@ class ActivationType(Enum):
     SILU = "silu"
 
 
+class ScoringFuncType(Enum):
+    SOFTMAX = "softmax"
+    SIGMOID = "sigmoid"
+
+
 def is_glu(activation_type: ActivationType):
     return activation_type in [ActivationType.SWIGLU, ActivationType.REGLU, ActivationType.GEGLU]

@@ -10,7 +10,7 @@ import torch
 import triton
 import triton.language as tl
 
-from ..enums import LIBRARY_NAME, TENSORMAP, ActivationType, is_glu
+from ..enums import LIBRARY_NAME, TENSORMAP, ActivationType, ScoringFuncType, is_glu
 from ..utils import ceil_divide, convert_torch_tensor_to_cute_tensor, get_powers_of_2
 from .moe_config import (
     HopperWgmma_MoE_Down_proj_ActGrad_Bwd,
@@ -485,7 +485,7 @@ def _token_broadcast_backward(
 
 
 @triton.jit
-def _softmax_bwd_scatter_small_kernel(
+def _activation_bwd_scatter_small_kernel(
     dlogits_ptr,
     dlogits_full_ptr,
     score_ptr,
@@ -502,6 +502,7 @@ def _softmax_bwd_scatter_small_kernel(
     K: tl.constexpr,
     BLOCK_K: tl.constexpr,
     dlogits_is_none: tl.constexpr,
+    scoring_func: tl.constexpr,
 ):
     row = tl.program_id(axis=0)
 
@@ -509,19 +510,38 @@ def _softmax_bwd_scatter_small_kernel(
     k_offs = tl.arange(0, BLOCK_K)
     k_mask = k_offs < K
 
+    # Load indices
     idx = tl.load(idx_ptr + row * stride_im + k_offs * stride_ik, mask=k_mask, other=0).to(tl.int32)
+
+    # Load forward probabilities (y) and incoming gradients (g)
     s_sel = tl.load(score_ptr + row * stride_sm + k_offs * stride_sn, mask=k_mask, other=0).to(tl.float32)
     g_sel = tl.load(dscore_ptr + row * stride_gm + k_offs * stride_gk, mask=k_mask, other=0).to(tl.float32)
 
-    # dot = sum_j g_j * y_j over selected columns
-    dot = tl.sum(g_sel * s_sel, axis=0)
+    if scoring_func == ScoringFuncType.SIGMOID:
+        # === Sigmoid Backward ===
+        # Derivative: dx = g * y * (1 - y)
+        # No cross-term reduction needed
+        add_vals = g_sel * s_sel * (1.0 - s_sel)
+    elif scoring_func == ScoringFuncType.SOFTMAX:
+        # === Softmax Backward ===
+        # Derivative: dx = y * (g - dot(g, y))
+        # Note: Even though Softmax was done on N (Global), since g is 0 for unselected
+        # indices, the dot product over just the TopK selected elements is correct.
 
-    # scatter-only: dx[idx] += y_sel * (g_sel - dot)
-    add_vals = s_sel * (g_sel - dot)
+        # dot = sum_j g_j * y_j over selected columns
+        dot = tl.sum(g_sel * s_sel, axis=0)
 
+        # scatter-only: dx[idx] += y_sel * (g_sel - dot)
+        add_vals = s_sel * (g_sel - dot)
+
+    # Calculate pointers to the full gradient matrix
     indices = row * stride_dm + idx * stride_dn
+
+    # Accumulate into existing gradients if necessary
     if not dlogits_is_none:
         add_vals += tl.load(dlogits_ptr + indices, mask=k_mask)
+
+    # Store result
     tl.store(dlogits_full_ptr + indices, add_vals, mask=k_mask)
 
 
@@ -533,10 +553,11 @@ def _softmax_topk_bwd(
     topk_router_score: torch.Tensor,
     topk_router_indices: torch.Tensor,
     K: int,
+    scoring_func: ScoringFuncType,
 ) -> None:
     T = dtopk_score.shape[0]
 
-    _softmax_bwd_scatter_small_kernel[T,](
+    _activation_bwd_scatter_small_kernel[T,](
         dlogits,
         dlogits_full,
         topk_router_score,
@@ -553,6 +574,7 @@ def _softmax_topk_bwd(
         K,
         triton.next_power_of_2(K),
         (dlogits is None),
+        scoring_func,
     )
 
 
