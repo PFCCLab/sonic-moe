@@ -31,6 +31,26 @@ Copyright (c) 2025, Wentao Guo, Mayank Mishra, Xinle Cheng, Ion Stoica, Tri Dao
 > import sonicmoe
 > # use sonicmoe
 > ```
+>
+> **Use with PaddleFleet**
+>
+> SonicMoE already integrates with PaddleFleet. You can install PaddleFleet pre-built wheel from our self-hosted index:
+>
+> ```bash
+> # For CUDA 12.9
+> pip install paddlefleet -i https://www.paddlepaddle.org.cn/packages/stable/cu129/
+> # For CUDA 13.0
+> pip install paddlefleet -i https://www.paddlepaddle.org.cn/packages/stable/cu130/
+> ```
+>
+> All indexes are available at https://www.paddlepaddle.org.cn/install/quick
+>
+> Then, you can use SonicMoE in PaddleFleet as follows:
+>
+> ```python
+> from paddlefleet.ops import sonicmoe
+> # use sonicmoe
+> ```
 
 The original README.md content is as follows:
 
