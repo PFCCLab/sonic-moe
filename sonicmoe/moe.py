@@ -5,13 +5,12 @@
 from typing import Callable
 
 import paddle
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from .count_cumsum import count_cumsum
-from .enums import ActivationType, KernelBackendMoE, is_glu
+from .enums import ActivationType, KernelBackendMoE, ScoringFuncType, is_glu
 from .functional import moe_TC_softmax_topk_layer
 
 
@@ -174,6 +173,7 @@ class MoE(nn.Module):
         hidden_size: int,
         intermediate_size: int,
         activation_function: ActivationType,
+        scoring_func: ScoringFuncType,
         add_bias: bool,
         std: float,
     ) -> None:
@@ -188,6 +188,7 @@ class MoE(nn.Module):
         self.router = nn.Linear(in_features=self.hidden_size, out_features=num_experts, bias=False)
 
         self.activation_function = activation_function
+        self.scoring_func = scoring_func
 
         self.c_fc = Experts(
             num_experts=num_experts,
@@ -229,6 +230,7 @@ class MoE(nn.Module):
                 self.top_k,
                 self.stream_id,
                 self.activation_function,
+                self.scoring_func,
                 is_inference_mode or not self.training,
             )
         else:

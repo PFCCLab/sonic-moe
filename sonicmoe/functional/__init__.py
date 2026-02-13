@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from quack.gemm_interface import gemm
 
 from ..count_cumsum import count_cumsum
-from ..enums import ActivationType, is_glu
+from ..enums import ActivationType, ScoringFuncType, is_glu
 from ..quack_utils import gemm_dgated, gemm_gated
 from .backward import _down_projection_backward, _softmax_topk_bwd, _token_broadcast_backward, _up_projection_backward
 from .forward import _down_projection_forward, _router_forward, _softmax_topk_fwd, _up_projection_forward
@@ -84,7 +84,9 @@ def general_routing_router_metadata(
 
 class TC_Softmax_Topk_Router_Function(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, router_logits: torch.Tensor, E: int, K: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        ctx, router_logits: torch.Tensor, E: int, K: int, scoring_func: ScoringFuncType
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         T = router_logits.size(0)
 
         # change this to router_logits.dtype (bfloat16) increase another 5 tflops at fwd at the cost of numerical accuracy
@@ -92,7 +94,7 @@ class TC_Softmax_Topk_Router_Function(torch.autograd.Function):
         topk_router_indices = torch.empty(T, K, dtype=torch.int32, device=router_logits.device)
         ctx.mark_non_differentiable(topk_router_indices)
 
-        _softmax_topk_fwd(router_logits, topk_router_score, topk_router_indices, E, K)
+        _softmax_topk_fwd(router_logits, topk_router_score, topk_router_indices, E, K, scoring_func)
 
         ctx.save_for_backward(topk_router_score, topk_router_indices)
         ctx.E = E
@@ -108,7 +110,7 @@ class TC_Softmax_Topk_Router_Function(torch.autograd.Function):
         topk_router_score, topk_router_indices = ctx.saved_tensor()
         dlogits = torch.zeros(T, ctx.E, dtype=ctx.dtype, device=topk_router_score.device)
 
-        _softmax_topk_bwd(dlogits, None, dtopk_score, topk_router_score, topk_router_indices, K)
+        _softmax_topk_bwd(dlogits, None, dtopk_score, topk_router_score, topk_router_indices, K, scoring_func)
 
         return dlogits
 
@@ -445,13 +447,14 @@ def moe_TC_softmax_topk_layer(
     K: int,
     stream_id: int,
     activation_type: ActivationType | str = ActivationType.SWIGLU,
+    scoring_func: ScoringFuncType | str = ScoringFuncType.SOFTMAX,
     is_inference_mode_enabled: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     assert ((b1 is None) and (b2 is None)) or (
         (b1 is not None) and (b2 is not None)
     ), "b1 and b2 has to be None or not None at the same time!"
     router_logits = F.linear(x, router_w)
-    topk_scores, topk_indices = TC_Softmax_Topk_Router_Function.apply(router_logits, router_w.size(0), K)
+    topk_scores, topk_indices = TC_Softmax_Topk_Router_Function.apply(router_logits, router_w.size(0), K, scoring_func)
     expert_frequency, expert_frequency_offset = count_cumsum(topk_indices.view(-1), router_w.size(0), do_cumsum=True)
 
     (
