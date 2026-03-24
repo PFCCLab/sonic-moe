@@ -592,7 +592,9 @@ class HopperWgmma_MoE_kernel:
 
                     cute.copy(A_g2s_thr_copy, mA_cur_copy, tAsA[None, None, i])
                 else:
-                    tAsA[None, None, i].fill(0.0)
+                    zero_frag = cute.make_fragment_like(tAsA[None, None, i])
+                    zero_frag.fill(0.0)
+                    cute.basic_copy(zero_frag, tAsA[None, None, i])
 
             else:
                 MIdx = tmAIdx[i]
