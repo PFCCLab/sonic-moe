@@ -5,7 +5,7 @@
 # torch>=2.7.1
 nvidia-cutlass-dsl==4.3.0
 # quack-kernels @ git+https://github.com/Dao-AILab/quack.git@3d0ab3ec2164749caac8f269f771e66a40efd2de
-quack-kernels @ git+https://github.com/PFCCLab/quack.git@7ef82a90403f4a407f82d522d658d2b7e87ef733
+quack-kernels @ git+https://github.com/PFCCLab/quack.git@12783f5ddbb20a2dd65bf88813db644c0e227f93
 pytest
 parameterized
 ninja
