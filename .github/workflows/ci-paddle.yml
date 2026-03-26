@@ -21,7 +21,7 @@ jobs:
       group: H20
     timeout-minutes: 30
     env:
-      container_name: tilelang-paddle-test-${{ github.run_id }}
+      container_name: sonic-moe-test-${{ github.run_id }}
     steps:
       - name: Check docker image and run container
         env:
@@ -39,6 +39,7 @@ jobs:
           docker run -d -t --gpus device=${GPU_DEVICES} --name ${{ env.container_name }} \
             -v "/dev/shm:/dev/shm" \
             -v ${{ github.workspace }}/../../..:${{ github.workspace }}/../../.. \
+            -v ${{ github.workspace }}/../../..:/root \
             -v ${{ github.workspace }}:/workspace \
             -e FLAGS_fraction_of_gpu_memory_to_use \
             -e CTEST_PARALLEL_LEVEL \
@@ -73,6 +74,7 @@ jobs:
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           set -e
           source ${{ github.workspace }}/../../../proxy
+          export UV_NO_PROGRESS=1
 
           # Install uv
           curl -LsSf https://astral.sh/uv/install.sh | sh
