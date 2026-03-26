@@ -8,7 +8,7 @@ dynamic = ["version"]
 requires-python = ">=3.12"
 dependencies = [
     "nvidia-cutlass-dsl==4.4.1",
-    "torch>=2.7.1,<=2.9.1",
+    # "torch>=2.7.1,<=2.9.1",
     "quack-kernels @ git+https://github.com/PFCCLab/quack.git@c81d790dd90f304fe9fc5cd250e06eddbef5b90d",
     "ninja"
 ]

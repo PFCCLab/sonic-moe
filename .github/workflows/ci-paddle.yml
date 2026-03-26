@@ -74,6 +74,7 @@ jobs:
           docker exec -t ${{ env.container_name }} /bin/bash -c '
           set -e
           source ${{ github.workspace }}/../../../proxy
+          export UV_NO_PROGRESS=1
 
           # Install uv
           curl -LsSf https://astral.sh/uv/install.sh | sh
