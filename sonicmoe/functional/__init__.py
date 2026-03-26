@@ -167,6 +167,7 @@ class _UpProjection(torch.autograd.Function):
             num_activated_expert_per_token_offset,
         )
 
+        ctx.has_num_activated_expert_per_token_offset = num_activated_expert_per_token_offset is not None
         ctx.mark_non_differentiable(y1)
         ctx.set_materialize_grads(False)
 
@@ -260,7 +261,10 @@ class _UpProjection(torch.autograd.Function):
         grads.extend([dx_reduced, dw1])
         if db1 is not None:
             grads.append(db1)
-        grads.extend([None] * 5)
+        if ctx.has_num_activated_expert_per_token_offset:
+            grads.extend([None] * 5)
+        else:
+            grads.extend([None] * 4)
         return tuple(grads)
 
 
@@ -280,7 +284,7 @@ class _DownProjection(torch.autograd.Function):
         x_gather_idx: torch.Tensor,
         s_scatter_idx: torch.Tensor,
         s_reverse_scatter_idx: torch.Tensor,
-        num_activated_expert_per_token_offset: torch.Tensor,
+        num_activated_expert_per_token_offset: torch.Tensor | None,
         is_varlen_K: bool,
         activation_type: ActivationType,
     ) -> torch.Tensor:
@@ -335,6 +339,7 @@ class _DownProjection(torch.autograd.Function):
             s_scatter_idx,
             s_reverse_scatter_idx,
         )
+        ctx.has_num_activated_expert_per_token_offset = num_activated_expert_per_token_offset is None
 
         return o
 
@@ -436,7 +441,12 @@ class _DownProjection(torch.autograd.Function):
         grads.extend([None, dz, dw2])
         if db2 is not None:
             grads.append(db2)
-        grads.extend([ds, *[None] * 5])
+
+        if ctx.has_num_activated_expert_per_token_offset:
+            grads.extend([ds, *[None] * 4])
+        else:
+            grads.extend([ds, *[None] * 5])
+
         return tuple(grads)
 
 

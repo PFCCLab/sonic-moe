@@ -11,7 +11,18 @@ from unittest import TestCase
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.testing import assert_close
+
+
+def assert_close(actual, expected, rtol=None, atol=None, **kwargs):
+    """Drop-in replacement for torch.testing.assert_close,
+    since paddle.testing is not available in the current Paddle version."""
+    a = actual.detach().cpu().float().numpy()
+    b = expected.detach().cpu().float().numpy()
+    if rtol is None:
+        rtol = 1.3e-6
+    if atol is None:
+        atol = 1e-5
+    np.testing.assert_allclose(a, b, rtol=rtol, atol=atol)
 
 
 class TestCommons(TestCase):
