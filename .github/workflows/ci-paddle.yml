@@ -87,8 +87,8 @@ jobs:
           uv pip install --pre paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/nightly/cu129/
 
           # Install project and minimal test runner
-          uv pip install -r requirements.txt --extra-index-url https://www.paddlepaddle.org.cn/packages/nightly/cu129/
-          uv pip install -e . --extra-index-url https://www.paddlepaddle.org.cn/packages/nightly/cu129/
+          uv pip install -r requirements.txt
+          uv pip install -e .
           '
 
       - name: Run tests
