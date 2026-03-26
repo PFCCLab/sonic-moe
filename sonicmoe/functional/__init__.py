@@ -339,7 +339,7 @@ class _DownProjection(torch.autograd.Function):
             s_scatter_idx,
             s_reverse_scatter_idx,
         )
-        ctx.has_num_activated_expert_per_token_offset = num_activated_expert_per_token_offset is None
+        ctx.has_num_activated_expert_per_token_offset = num_activated_expert_per_token_offset is not None
 
         return o
 
@@ -443,9 +443,9 @@ class _DownProjection(torch.autograd.Function):
             grads.append(db2)
 
         if ctx.has_num_activated_expert_per_token_offset:
-            grads.extend([ds, *[None] * 4])
-        else:
             grads.extend([ds, *[None] * 5])
+        else:
+            grads.extend([ds, *[None] * 4])
 
         return tuple(grads)
 
