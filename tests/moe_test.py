@@ -46,20 +46,7 @@ class MoETest(TestCommons):
         TestCommons.make_args_matrix(
             [paddle.device("cuda")],
             [torch.bfloat16],
-            [
-                (8192, 768, 256, 128, 8),
-                (8192, 768, 512, 64, 4),
-                (8192, 768, 1024, 32, 2),
-                (8192, 1536, 256, 128, 8),
-                (8192, 1536, 512, 64, 4),
-                (8192, 1536, 1024, 32, 2),
-                (8192, 4096, 256, 256, 16),
-                (8192, 4096, 512, 128, 8),
-                (8192, 4096, 1024, 64, 4),
-                (8192, 4096, 512, 256, 16),
-                (8192, 4096, 1024, 128, 8),
-                (8192, 4096, 2048, 64, 4),
-            ],
+            problem_shapes,
             [KernelBackendMoE.sonicmoe],  # kernel_backend_moe
             [False],  # is_compiling
             [False, True],  # add_bias
